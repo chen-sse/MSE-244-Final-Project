@@ -119,8 +119,11 @@ print(nonzero_positions.head())
 plt.figure(figsize=(12, 8))
 sns.heatmap(nonzero_positions.T, cmap='coolwarm', cbar=True)
 plt.title('Heatmap of ETF Positions Over Time')
-plt.xlabel('Date')
+plt.xlabel('')
 plt.ylabel('ETFs')
+
+ax = plt.gca()
+ax.set_xticks([])
 plt.show()
 
 # Plot 2: Cumulative Returns
