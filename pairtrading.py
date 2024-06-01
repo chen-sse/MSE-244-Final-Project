@@ -2,12 +2,17 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import statsmodels.api as sm
-import random
+import arch.unitroot
+from statsmodels.tsa.stattools import coint
+from itertools import combinations
 import warnings
 warnings.filterwarnings("ignore")
 
 # Load CSV
 prices = pd.read_csv('N225.csv')
+
+# Drop tickers with NA values
+prices = prices.dropna(axis=1, how='any')
 
 # Extract the industrial classification, sector, and company names
 metadata = pd.DataFrame(prices.iloc[:3])
@@ -28,6 +33,32 @@ prices = prices.astype(float)
 honda = prices['7267.T']
 toyota = prices['7203.T']
 
+# Generate all unique pairs of tickers
+tickers = prices.columns
+num_pairs = sum(1 for _ in combinations(tickers, 2))
+pairs = combinations(tickers, 2)
+results = {}
+
+# Iterate over each pair and perform Engle-Granger cointegration test on log prices
+# We take the more significant of the two p-values
+count = 0
+low_p_values = 0
+for stock1, stock2 in pairs:
+    count += 1
+    p_value = min(coint(np.log(prices[stock1]), np.log(prices[stock2]))[1], coint(np.log(prices[stock2]), np.log(prices[stock1]))[1])
+    results[(stock1, stock2)] = p_value
+    if p_value < 0.05:
+        low_p_values += 1
+    print(f"{count} of {num_pairs} completed; # of p-values < 0.05: {low_p_values}")
+
+# Sort results by p-value
+sorted_results = sorted(results.items(), key=lambda x: x[1])
+
+# Display the top 10 pairs with the lowest p-values
+print(sorted_results[:10])
+
+########## calculate returns of trading strategy ##########
+'''
 # Normalize prices
 honda_normalized = honda / honda.iloc[0]
 toyota_normalized = toyota / toyota.iloc[0]
@@ -92,3 +123,4 @@ plt.xlabel('Date')
 plt.ylabel('Cumulative Returns')
 plt.show()
 print('Finished')
+'''
