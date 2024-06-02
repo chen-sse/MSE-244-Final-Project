@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import statsmodels.api as sm
-import arch.unitroot
+from arch.unitroot.cointegration import phillips_ouliaris, engle_granger
 from statsmodels.tsa.stattools import coint
 from itertools import combinations
 import warnings
@@ -29,7 +29,8 @@ prices['Date'] = pd.to_datetime(prices['Date'])
 prices.set_index('Date', inplace=True, drop=True)
 prices = prices.astype(float)
 
-# Extract price series for Honda and Toyota
+# Extract price series for Honda and Toyota (or any two stocks) IN ONE DIRECTION
+# Direction of regression matters!
 honda = prices['7267.T']
 toyota = prices['7203.T']
 
@@ -45,7 +46,25 @@ count = 0
 low_p_values = 0
 for stock1, stock2 in pairs:
     count += 1
-    p_value = min(coint(np.log(prices[stock1]), np.log(prices[stock2]))[1], coint(np.log(prices[stock2]), np.log(prices[stock1]))[1])
+    p_value = min(engle_granger(np.log(prices[stock1]), np.log(prices[stock2])).pvalue, engle_granger(np.log(prices[stock2]), np.log(prices[stock1])).pvalue)
+    results[(stock1, stock2)] = p_value
+    if p_value < 0.05:
+        low_p_values += 1
+    print(f"{count} of {num_pairs} completed; # of p-values < 0.05: {low_p_values}")
+
+# Sort results by p-value
+sorted_results = sorted(results.items(), key=lambda x: x[1])
+
+# Display the top 10 pairs with the lowest p-values
+print(sorted_results[:10])
+
+# Iterate over each pair and perform Phillips-Ouliaris cointegration test
+# We take the more significant of the two p-values
+count = 0
+low_p_values = 0
+for stock1, stock2 in pairs:
+    count += 1
+    p_value = min(phillips_ouliaris(prices[stock1], prices[stock2]).pvalue, phillips_ouliaris(prices[stock2], prices[stock1]).pvalue)
     results[(stock1, stock2)] = p_value
     if p_value < 0.05:
         low_p_values += 1
@@ -58,7 +77,7 @@ sorted_results = sorted(results.items(), key=lambda x: x[1])
 print(sorted_results[:10])
 
 ########## calculate returns of trading strategy ##########
-'''
+
 # Normalize prices
 honda_normalized = honda / honda.iloc[0]
 toyota_normalized = toyota / toyota.iloc[0]
@@ -114,6 +133,7 @@ honda_return = honda_position_shifted * honda_pct_change
 toyota_return = toyota_position_shifted * toyota_pct_change
 strategy_return = honda_return + toyota_return
 cum_return = (1 + strategy_return).cumprod()
+print(cum_return.iloc[-1])
 
 # Plot the cumulative returns
 print('Plotting results...')
@@ -123,4 +143,4 @@ plt.xlabel('Date')
 plt.ylabel('Cumulative Returns')
 plt.show()
 print('Finished')
-'''
+
